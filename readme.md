@@ -19,7 +19,8 @@ sfjwt/
 ├── .gitignore
 ├── gen_cert.py         # gera server.key + server.crt
 ├── gen_jwt.py           # monta, assina o JWT e troca por access token
-└── requirements.txt    # dependências do projeto
+├── requirements.txt    # dependências do projeto
+└── setup.sh             # cria venv, requirements.txt e .env automaticamente
 
 # gerados localmente, não versionados:
 ├── venv/               # ambiente virtual
@@ -36,34 +37,30 @@ sfjwt/
   - "Enable OAuth Settings" habilitado
   - O usuário (`SF_USERNAME`) com acesso "Pre-Authorized" à Connected App
 
-### Setup (sem script automático — venv manual)
+### Setup (automático)
 
 ```bash
 cd sfjwt
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+chmod +x setup.sh
+./setup.sh
 ```
 
-Confirme que está usando o Python da venv: `which python` deve apontar para dentro de `sfjwt/venv/bin/python`. A venv precisa ser reativada (`source venv/bin/activate`) toda vez que você abrir um novo terminal.
+Isso cria `venv/`, instala as dependências (`PyJWT`, `cryptography`, `python-dotenv`), gera o `.env` em branco e o `.gitignore`.
 
 ### Uso
 
 ```bash
+source venv/bin/activate
+
 # 1. Gerar certificado e chave privada
 python gen_cert.py
 # -> cria server.key e server.crt. Faça upload do server.crt na Connected App
 #    do Salesforce, em Setup > App Manager > [sua Connected App] > Edit > Use digital signatures.
 
-# 2. Criar o .env dentro de sfjwt/ (nunca commitado)
-cat > .env <<'EOF'
-SF_PRIVATE_KEY_PATH=server.key
-SF_CONSUMER_KEY=seu_consumer_key_da_connected_app
-SF_USERNAME=seu_usuario@org.com
-SF_LOGIN_URL=https://login.salesforce.com
-EOF
-# Use https://login.salesforce.com para produção/dev-edition
-# ou https://test.salesforce.com para sandbox.
+# 2. Editar o .env (criado pelo setup.sh) com:
+#    SF_CONSUMER_KEY=seu_consumer_key_da_connected_app
+#    SF_USERNAME=seu_usuario@org.com
+#    SF_LOGIN_URL=https://login.salesforce.com  (ou https://test.salesforce.com para sandbox)
 
 # 3. Gerar o token e autenticar
 python gen_jwt.py
