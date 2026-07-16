@@ -1,10 +1,5 @@
 # salesforce-bulk-toolkit
 
-> Sugestão de nome: este repo começou como "Python" genérico, mas hoje é um
-> toolkit específico de integração com Salesforce (Bulk API 2.0 + JWT Bearer
-> Flow). Renomear no GitHub (Settings > repository name) não quebra links
-> antigos — o GitHub redireciona automaticamente.
-
 Toolkit de scripts Python para operações em massa no Salesforce:
 
 - [`sf-jwt/`](./sf-jwt) — gera certificado/chave RSA e monta um JWT assinado para o **JWT Bearer Flow**.
@@ -37,7 +32,7 @@ Se não retornar nada, está seguro. Se algo já foi commitado por engano, remov
 sf-jwt/
 ├── .gitignore
 ├── gen_cert.py      # gera salesforce.key + connectedAppCertificate.crt
-├── gen_jwt.py        # monta e assina o JWT (imprime no terminal)
+├── gen_jwt.py        # monta o JWT, assina, e troca pelo access token via /services/oauth2/token
 ├── requirements.txt
 └── setup.sh          # cria venv, requirements.txt e .env
 
@@ -47,8 +42,6 @@ sf-jwt/
 ├── salesforce.key
 └── connectedAppCertificate.crt
 ```
-
-> **Nota importante**: `gen_jwt.py`, hoje, só **monta e imprime o JWT assinado** — ele não troca esse JWT pelo access token no endpoint `/services/oauth2/token` do Salesforce. Se seu objetivo final é obter um token de acesso utilizável (não só o JWT), esse é um passo a mais que ainda falta implementar aqui.
 
 ### Pré-requisitos
 
@@ -68,6 +61,7 @@ python gen_cert.py
 
 # edite o .env com SF_CONSUMER_KEY e SF_USERNAME
 python gen_jwt.py
+# -> imprime access_token e instance_url, prontos para uso
 ```
 
 ---
