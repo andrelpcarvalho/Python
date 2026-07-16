@@ -1,50 +1,103 @@
 #!/usr/bin/env bash
 #
 # setup.sh
+# Cria o ambiente para rodar bulk_query.py:
+#   - venv Python
+#   - requirements.txt
+#   - .env (template, com valores em branco para você preencher)
 #
-# Prepara o ambiente do projeto: cria venv, instala as
-# dependencias do requirements.txt e copia o .env.example
-# pra .env (se ainda nao existir).
+# Uso:
+#   chmod +x setup.sh
+#   ./setup.sh
 #
-# ── USO ──────────────────────────────────────────────────────
-# chmod +x setup.sh
-# ./setup.sh
+# Depois, pra rodar:
+#   source venv/bin/activate
+#   set -a && source .env && set +a
+#   python bulk_query.py
 
 set -e
 
-VENV_DIR=".venv"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_DIR"
 
-echo "== Setup do projeto =="
+echo "==> Diretório do projeto: $PROJECT_DIR"
 
-if [ ! -d "$VENV_DIR" ]; then
-    echo "Criando virtualenv em $VENV_DIR..."
-    python3 -m venv "$VENV_DIR"
+# ---------- requirements.txt ----------
+if [ ! -f requirements.txt ]; then
+  echo "==> Criando requirements.txt"
+  cat > requirements.txt <<'EOF'
+requests>=2.31.0
+python-dotenv>=1.0.0
+EOF
 else
-    echo "Virtualenv ja existe em $VENV_DIR, pulando criacao."
+  echo "==> requirements.txt já existe, mantendo"
 fi
 
-echo "Ativando virtualenv..."
-source "$VENV_DIR/bin/activate"
+# ---------- .env ----------
+if [ ! -f .env ]; then
+  echo "==> Criando .env (preencha os valores antes de rodar)"
+  cat > .env <<'EOF'
+# Consumer Key do Connected App
+SF_CLIENT_ID=
 
-echo "Instalando dependencias..."
-pip install --upgrade pip
-pip install -r requirements.txt
+# Consumer Secret do Connected App
+SF_CLIENT_SECRET=
 
-if [ ! -f ".env" ]; then
-    if [ -f ".env.example" ]; then
-        cp .env.example .env
-        echo ".env criado a partir de .env.example. Preencha SF_CLIENT_ID, SF_CLIENT_SECRET e SF_LOGIN_URL."
-    else
-        echo "Aviso: .env.example nao encontrado, .env nao foi criado."
-    fi
+# My Domain da org, ex: https://suaorg.my.salesforce.com
+SF_LOGIN_URL=
+
+# Versão da API
+SF_API_VERSION=v61.0
+
+# Objeto a consultar, ex: Account
+SF_OBJECT=
+
+# Campos separados por vírgula, ex: Id,Name,BillingCity
+SF_FIELDS=
+
+# Cláusula WHERE opcional (sem o "WHERE"), ex: CreatedDate = TODAY
+SF_WHERE=
+
+# ORDER BY opcional (sem o "ORDER BY"), ex: CreatedDate DESC
+SF_ORDER_BY=
+
+# LIMIT opcional (sem o "LIMIT"), ex: 1000
+SF_LIMIT=
+
+# Caminho do CSV de saída
+SF_OUTPUT_PATH=./output/resultado.csv
+EOF
+  echo "    -> Edite o .env e preencha SF_CLIENT_ID, SF_CLIENT_SECRET, SF_LOGIN_URL, SF_OBJECT e SF_FIELDS"
 else
-    echo ".env ja existe, mantido como esta."
+  echo "==> .env já existe, mantendo (não sobrescrito)"
 fi
+
+# ---------- .gitignore ----------
+if [ ! -f .gitignore ]; then
+  echo "==> Criando .gitignore"
+  cat > .gitignore <<'EOF'
+.env
+venv/
+logs/
+output/
+EOF
+fi
+
+# ---------- venv ----------
+if [ ! -d venv ]; then
+  echo "==> Criando venv"
+  python3 -m venv venv
+else
+  echo "==> venv já existe, mantendo"
+fi
+
+echo "==> Instalando dependências dentro do venv"
+./venv/bin/pip install --upgrade pip --quiet
+./venv/bin/pip install -r requirements.txt --quiet
 
 echo ""
-echo "Setup concluido."
-echo "Proximos passos:"
-echo "  1. source $VENV_DIR/bin/activate"
-echo "  2. Preencher credenciais no .env"
-echo "  3. python config.py              # define objeto/campos/output"
-echo "  4. python bulk_query_account.py  # roda a query"
+echo "==> Setup concluído."
+echo "    1. Edite o .env com suas credenciais e a query desejada"
+echo "    2. source venv/bin/activate"
+echo "    3. set -a && source .env && set +a"
+echo "    4. python bulk_query.py"

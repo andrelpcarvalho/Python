@@ -1,0 +1,125 @@
+"""
+field_mapping.py
+
+Antes de rodar bulk_update.py contra um objeto (principalmente um
+objeto novo, ou um CSV com colunas fora do padrão da API — nomes
+de negocio, labels, maiusculas diferentes etc.), rode este script
+pra mapear cada coluna do CSV para o campo real da API.
+
+Usa o Describe do objeto (via REST API) pra sugerir automaticamente
+o campo certo (por nome exato, label, ou aproximacao). Voce confirma
+ou corrige cada sugestao no terminal. O resultado vai pra
+header_mapping.json.
+
+Assume que todos os CSVs em CSV_DIR compartilham o mesmo cabecalho
+(e o caso quando eles vem do split_csv.py).
+
+── PRE-REQUISITOS ──────────────────────────────────────────────
+SF_OBJECT precisa estar definido no .env (o objeto que voce vai
+atualizar, ex: Account, Contact, Custom_Object__c).
+
+── USO ─────────────────────────────────────────────────────────
+python field_mapping.py
+"""
+
+import csv
+import glob
+import json
+import os
+import sys
+from difflib import get_close_matches
+
+import requests
+from dotenv import load_dotenv
+
+from auth import authenticate, AuthError
+
+load_dotenv()
+
+
+def get_first_csv_header(csv_dir):
+    files = sorted(glob.glob(os.path.join(csv_dir, "*.csv")))
+    if not files:
+        raise SystemExit(f"Nenhum CSV encontrado em {csv_dir}")
+    with open(files[0], "r", newline="", encoding="utf-8-sig") as f:
+        header = next(csv.reader(f))
+    return header, files[0]
+
+
+def describe_object(auth, sobject, api_version):
+    url = f"{auth['instance_url']}/services/data/{api_version}/sobjects/{sobject}/describe"
+    resp = requests.get(url, headers={"Authorization": f"Bearer {auth['access_token']}"}, timeout=30)
+    if not resp.ok:
+        raise SystemExit(f"Erro ao consultar Describe de {sobject}: {resp.status_code} {resp.text}")
+    return resp.json()["fields"]  # cada item: {"name": "AccountId", "label": "Account ID", ...}
+
+
+def suggest_field(csv_col, fields):
+    """Tenta achar o campo certo por nome exato, label, ou aproximacao."""
+    normalized = csv_col.strip().lower().replace(" ", "").replace("_", "")
+
+    for f in fields:
+        if f["name"].lower() == normalized or f["label"].lower().replace(" ", "") == normalized:
+            return f["name"]
+
+    close = get_close_matches(csv_col, [f["name"] for f in fields], n=1, cutoff=0.6)
+    return close[0] if close else None
+
+
+def main():
+    load_dotenv(override=True)  # relê o .env do disco (pode ter sido atualizado pelo config.py)
+
+    csv_dir = os.environ.get("CSV_DIR", "./csv")
+    sf_object = os.environ.get("SF_OBJECT")
+    api_version = os.environ.get("SF_API_VERSION", "v61.0")
+    mapping_path = os.environ.get("HEADER_MAPPING_PATH", "header_mapping.json")
+
+    if not sf_object:
+        raise SystemExit("SF_OBJECT não definido no .env")
+
+    header, sample_file = get_first_csv_header(csv_dir)
+    print(f"Cabeçalho lido de: {sample_file}")
+    print(f"Colunas encontradas: {header}\n")
+
+    auth = authenticate()
+    fields = describe_object(auth, sf_object, api_version)
+    valid_names = {f["name"] for f in fields}
+
+    print(f"Mapeando colunas para os campos de '{sf_object}'.")
+    print("Enter aceita a sugestão entre colchetes; digite outro nome pra corrigir.\n")
+
+    mapping = {}
+    for col in header:
+        if col in valid_names:
+            print(f"'{col}' já é um campo válido da API. Mantendo.")
+            mapping[col] = col
+            continue
+
+        suggestion = suggest_field(col, fields)
+        prompt = f"Coluna '{col}' -> campo da API"
+        if suggestion:
+            prompt += f" [{suggestion}]"
+        answer = input(prompt + ": ").strip()
+        final = answer if answer else suggestion
+
+        if not final or final not in valid_names:
+            print(f"  ATENÇÃO: '{final}' não é um campo válido de {sf_object}.")
+            final = input(f"  Digite o campo correto (ou Enter pra manter '{col}' como está): ").strip() or col
+
+        mapping[col] = final
+
+    with open(mapping_path, "w") as f:
+        json.dump(mapping, f, indent=2, ensure_ascii=False)
+
+    print(f"\nMapeamento salvo em {os.path.abspath(mapping_path)}:")
+    for original, final in mapping.items():
+        note = "" if original == final else "  <- renomeado"
+        print(f"  {original} -> {final}{note}")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except AuthError as exc:
+        print(f"Erro de autenticação: {exc}")
+        sys.exit(1)
