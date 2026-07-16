@@ -1,22 +1,20 @@
 """
-run.py
+run_update.py
 
-Orquestra o fluxo completo do bulkApi:
-  1. config.py       -> pergunta objeto, operação, external ID field, CSV_DIR
-  2. field_mapping.py -> opcional, só se as colunas do CSV não baterem com a API
-  3. bulk_update.py   -> executa o update/insert/upsert/delete em massa
-
-Um comando só, do "o que eu quero fazer" até os 23 arquivos processados.
+Orquestra o fluxo de update/insert/upsert/delete:
+  1. configure_update.py -> pergunta objeto, operação, external ID field, CSV_DIR
+  2. field_mapping.py    -> opcional, só se as colunas do CSV não baterem com a API
+  3. update.py            -> executa o job em massa
 
 ── USO ─────────────────────────────────────────────────────────
-python run.py
+python run_update.py
 """
 
 import sys
 
-import config
+import configure_update as config
 import field_mapping
-import bulk_update
+import update as bulk_update
 
 
 def ask_yes_no(label: str, default: bool = False) -> bool:
@@ -32,17 +30,15 @@ def main():
     config.main()
 
     print("\n== Passo 2/3: mapeamento de colunas ==")
-    precisa_mapear = ask_yes_no(
-        "As colunas do CSV batem exatamente com os nomes de campo da API?", default=True
-    )
-    if not precisa_mapear:
+    ja_bate = ask_yes_no("As colunas do CSV batem exatamente com os nomes de campo da API?", default=True)
+    if not ja_bate:
         print()
         field_mapping.main()
     else:
         print("Pulando mapeamento — CSV será enviado com as colunas originais.")
 
-    print("\n== Passo 3/3: executando o bulk update ==\n")
-    bulk_update.reload_config()  # relê o .env que o config.py acabou de escrever
+    print("\n== Passo 3/3: executando o job em massa ==\n")
+    bulk_update.reload_config()  # relê o .env que o configure_update.py acabou de escrever
     bulk_update.main()
 
 

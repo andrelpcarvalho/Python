@@ -1,7 +1,7 @@
 """
-config.py
+configure_query.py
 
-Roda ANTES do bulk_query.py. Pergunta no terminal quais sao o
+Roda ANTES do query.py. Pergunta no terminal quais sao o
 objeto, os campos, o WHERE e o output path da query, e grava essas
 respostas no .env — sem apagar as outras variaveis que ja
 estiverem la (SF_CLIENT_ID, SF_CLIENT_SECRET, SF_LOGIN_URL etc).
@@ -9,8 +9,8 @@ estiverem la (SF_CLIENT_ID, SF_CLIENT_SECRET, SF_LOGIN_URL etc).
 Util pra rodar queries diferentes sem editar o .env na mao toda vez.
 
 ── USO ─────────────────────────────────────────────────────────
-python config.py
-python bulk_query.py
+python configure_query.py
+python query.py
 """
 
 import os

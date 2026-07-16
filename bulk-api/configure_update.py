@@ -1,13 +1,13 @@
 """
-config.py
+configure_update.py
 
-Roda ANTES do bulk_update.py. Pergunta no terminal qual objeto,
+Roda ANTES do update.py. Pergunta no terminal qual objeto,
 operação, external ID field (se upsert) e diretório de CSVs usar,
 e grava essas respostas no .env — sem apagar as outras variáveis
 que já estiverem lá (SF_CLIENT_ID, SF_CLIENT_SECRET, SF_LOGIN_URL etc).
 
 ── USO ─────────────────────────────────────────────────────────
-python config.py
+python configure_update.py
 """
 
 import os

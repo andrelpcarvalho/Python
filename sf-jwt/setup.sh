@@ -13,7 +13,7 @@
 # Depois, pra rodar:
 #   source venv/bin/activate
 #   python gen_cert.py
-#   # edite o .env, faça upload do server.crt na Connected App
+#   # edite o .env, faça upload do connectedAppCertificate.crt na Connected App
 #   python gen_jwt.py
 
 set -e
@@ -23,7 +23,6 @@ cd "$PROJECT_DIR"
 
 echo "==> Diretório do projeto: $PROJECT_DIR"
 
-# ---------- requirements.txt ----------
 if [ ! -f requirements.txt ]; then
   echo "==> Criando requirements.txt"
   cat > requirements.txt <<'EOF'
@@ -37,12 +36,11 @@ else
   echo "==> requirements.txt já existe, mantendo"
 fi
 
-# ---------- .env ----------
 if [ ! -f .env ]; then
   echo "==> Criando .env (preencha os valores antes de rodar)"
   cat > .env <<'EOF'
-# Caminho da chave privada gerada por gen_cert.py
-SF_PRIVATE_KEY_PATH=server.key
+# Caminho da chave privada gerada por gen_cert.py (nome real do arquivo, não mude)
+SF_PRIVATE_KEY_PATH=salesforce.key
 
 # Consumer Key da Connected App
 SF_CONSUMER_KEY=
@@ -58,12 +56,13 @@ else
   echo "==> .env já existe, mantendo (não sobrescrito)"
 fi
 
-# ---------- .gitignore ----------
 if [ ! -f .gitignore ]; then
   echo "==> Criando .gitignore"
   cat > .gitignore <<'EOF'
 venv/
 .env
+salesforce.key
+connectedAppCertificate.crt
 *.key
 *.crt
 __pycache__/
@@ -71,7 +70,6 @@ __pycache__/
 EOF
 fi
 
-# ---------- venv ----------
 if [ ! -d venv ]; then
   echo "==> Criando venv"
   python3 -m venv venv
@@ -86,7 +84,11 @@ echo "==> Instalando dependências dentro do venv"
 echo ""
 echo "==> Setup concluído."
 echo "    1. source venv/bin/activate"
-echo "    2. python gen_cert.py   (gera server.key + server.crt)"
-echo "    3. Faça upload do server.crt na Connected App do Salesforce"
+echo "    2. python gen_cert.py   (gera salesforce.key + connectedAppCertificate.crt)"
+echo "    3. Faça upload do connectedAppCertificate.crt na Connected App do Salesforce"
 echo "    4. Edite o .env com SF_CONSUMER_KEY e SF_USERNAME"
-echo "    5. python gen_jwt.py    (gera e testa o access token)"
+echo "    5. python gen_jwt.py    (gera e imprime o JWT assinado)"
+echo ""
+echo "    OBS: gen_jwt.py hoje só monta e imprime o JWT — não troca pelo"
+echo "    access token no /services/oauth2/token. Se precisar do token de"
+echo "    fato (não só o JWT), isso é um passo extra a implementar."

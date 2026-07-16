@@ -1,0 +1,8 @@
+venv/
+.env
+salesforce.key
+connectedAppCertificate.crt
+*.key
+*.crt
+__pycache__/
+*.pyc

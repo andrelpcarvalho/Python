@@ -1,0 +1,10 @@
+.env
+venv/
+logs/
+csv/
+output/
+__pycache__/
+*.pyc
+*.key
+*.crt
+*.pem

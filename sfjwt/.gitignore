@@ -1,7 +1,0 @@
-# sfjwt/.gitignore
-venv/
-.env
-*.key
-*.crt
-__pycache__/
-*.pyc

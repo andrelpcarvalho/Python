@@ -1,19 +1,18 @@
 """
-run.py
+run_query.py
 
-Orquestra o fluxo completo: pergunta a configuracao da query
-(config.py) e, em seguida, ja executa o bulk_query.py com o .env
-recem-atualizado. Um comando só, do "o que eu quero consultar"
-ate o CSV pronto.
+Orquestra o fluxo de query:
+  1. configure_query.py -> pergunta objeto, campos, WHERE, ORDER BY, LIMIT, output
+  2. query.py             -> executa a query na Bulk API 2.0
 
 ── USO ─────────────────────────────────────────────────────────
-python run.py
+python run_query.py
 """
 
 import sys
 
-import config
-import bulk_query
+import configure_query as config
+import query as bulk_query
 
 
 def main():
@@ -21,7 +20,7 @@ def main():
     config.main()
 
     print("\n== Passo 2/2: executando a query na Bulk API 2.0 ==\n")
-    bulk_query.reload_config()  # relê o .env que o config.py acabou de escrever
+    bulk_query.reload_config()  # relê o .env que o configure_query.py acabou de escrever
     bulk_query.main()
 
 

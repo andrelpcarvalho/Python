@@ -1,187 +1,183 @@
-# Python
+# salesforce-bulk-toolkit
 
-Repositório de projetos Python. Atualmente contém:
+> Sugestão de nome: este repo começou como "Python" genérico, mas hoje é um
+> toolkit específico de integração com Salesforce (Bulk API 2.0 + JWT Bearer
+> Flow). Renomear no GitHub (Settings > repository name) não quebra links
+> antigos — o GitHub redireciona automaticamente.
 
-- [`sfjwt/`](./sfjwt) — geração de certificado/chave RSA e autenticação no Salesforce via **JWT Bearer Flow** (OAuth 2.0).
-- [`bulkApi/`](./bulkApi) — atualização em massa de registros do Salesforce via **Bulk API 2.0**, autenticado via **Client Credentials Flow**, processando múltiplos CSVs em sequência.
-- [`splitLargeCsv/`](./splitLargeCsv) — divide um CSV grande em N arquivos menores, prontos para alimentar o `bulkApi`.
+Toolkit de scripts Python para operações em massa no Salesforce:
 
-Cada projeto tem sua própria venv, `requirements.txt` e `.env` — são independentes entre si.
+- [`sf-jwt/`](./sf-jwt) — gera certificado/chave RSA e monta um JWT assinado para o **JWT Bearer Flow**.
+- [`bulk-api/`](./bulk-api) — consulta (`query.py`) e grava em massa (`update.py`) qualquer objeto do Salesforce via **Bulk API 2.0**, autenticado via **Client Credentials Flow**.
+- [`split-large-csv/`](./split-large-csv) — divide um CSV grande em N arquivos menores, prontos para alimentar o `bulk-api`.
+
+Cada pasta tem sua própria venv, `requirements.txt` e `.env` — são independentes entre si (exceto `bulk-api`, que unifica query e update num único ambiente, já que compartilham autenticação e formato de configuração).
 
 ---
 
-## sfjwt
+## ⚠️ Segurança — leia antes de tudo
+
+Este repositório é **público**. Nunca commite: `venv/`, `.env`, `*.key`, `*.crt`, `csv/`, `logs/`, `output/`. Cada pasta tem seu próprio `.gitignore`, e agora também existe um **`.gitignore` na raiz** cobrindo esses padrões globalmente — isso corrige um problema real: um `.env` chegou a ser commitado na raiz do repo porque não havia proteção nesse nível (só dentro das subpastas). Nenhuma credencial vazou nesse incidente (o `.env` em questão só tinha parâmetros de query, sem client secret), mas o princípio vale: a partir de agora, rode os scripts sempre de dentro da pasta do projeto, nunca da raiz.
+
+Antes de qualquer `git push`, confirme que nada sensível está rastreado:
+
+```bash
+git ls-files | grep -E "\.key$|\.crt$|\.env$|venv/"
+```
+
+Se não retornar nada, está seguro. Se algo já foi commitado por engano, remova do tracking (`git rm --cached arquivo`) e, se era credencial de verdade (não é o caso aqui), revogue e gere uma nova.
+
+---
+
+## sf-jwt
 
 ### Estrutura
 
 ```
-sfjwt/
+sf-jwt/
 ├── .gitignore
-├── gen_cert.py         # gera server.key + server.crt
-├── gen_jwt.py           # monta, assina o JWT e troca por access token
-├── requirements.txt    # dependências do projeto
-└── setup.sh             # cria venv, requirements.txt e .env automaticamente
-
-# gerados localmente, não versionados:
-├── venv/               # ambiente virtual
-├── .env                # variáveis sensíveis
-├── server.key           # chave privada
-└── server.crt           # certificado público
-```
-
-### Pré-requisitos
-
-- Python 3.9+
-- Uma Connected App configurada no Salesforce com:
-  - "Use digital signatures" habilitado, com o `server.crt` gerado por este projeto
-  - "Enable OAuth Settings" habilitado
-  - O usuário (`SF_USERNAME`) com acesso "Pre-Authorized" à Connected App
-
-### Setup (automático)
-
-```bash
-cd sfjwt
-chmod +x setup.sh
-./setup.sh
-```
-
-Isso cria `venv/`, instala as dependências (`PyJWT`, `cryptography`, `python-dotenv`), gera o `.env` em branco e o `.gitignore`.
-
-### Uso
-
-```bash
-source venv/bin/activate
-
-# 1. Gerar certificado e chave privada
-python gen_cert.py
-# -> cria server.key e server.crt. Faça upload do server.crt na Connected App
-#    do Salesforce, em Setup > App Manager > [sua Connected App] > Edit > Use digital signatures.
-
-# 2. Editar o .env (criado pelo setup.sh) com:
-#    SF_CONSUMER_KEY=seu_consumer_key_da_connected_app
-#    SF_USERNAME=seu_usuario@org.com
-#    SF_LOGIN_URL=https://login.salesforce.com  (ou https://test.salesforce.com para sandbox)
-
-# 3. Gerar o token e autenticar
-python gen_jwt.py
-```
-
-O `gen_jwt.py` monta o JWT assinado com `server.key`, troca por um access token no endpoint `/services/oauth2/token` do Salesforce e imprime a resposta (access token + instance URL).
-
-### Problemas comuns
-
-| Erro | Causa provável |
-|---|---|
-| `ModuleNotFoundError: No module named 'jwt'` ou `'dotenv'` | Venv não ativa, ou dependência não instalada. Rode `source venv/bin/activate` e `pip install -r requirements.txt`. |
-| `zsh: command not found: pip` | Venv não está ativa. Ative com `source venv/bin/activate`. |
-| `invalid_grant` na resposta do Salesforce | Certificado (`server.crt`) não corresponde à chave usada para assinar; usuário sem "Pre-Authorized" na Connected App; ou relógio do sistema dessincronizado (o `exp` do JWT fica inválido). |
-
----
-
-## bulkApi
-
-### Estrutura
-
-```
-bulkApi/
-├── .gitignore
-├── auth.py                    # autenticação via Client Credentials Flow
-├── bulk_update_account.py     # pipeline de update em massa (Bulk API 2.0)
+├── gen_cert.py      # gera salesforce.key + connectedAppCertificate.crt
+├── gen_jwt.py        # monta e assina o JWT (imprime no terminal)
 ├── requirements.txt
-└── setup.sh                    # cria venv, requirements.txt e .env automaticamente
+└── setup.sh          # cria venv, requirements.txt e .env
 
 # gerados localmente, não versionados:
 ├── venv/
 ├── .env
-├── csv/                        # arquivos de entrada (23 CSVs, ex: parte_1.csv...parte_23.csv)
-└── logs/                        # logs de execução + resultados de sucesso/erro por job
+├── salesforce.key
+└── connectedAppCertificate.crt
+```
+
+> **Nota importante**: `gen_jwt.py`, hoje, só **monta e imprime o JWT assinado** — ele não troca esse JWT pelo access token no endpoint `/services/oauth2/token` do Salesforce. Se seu objetivo final é obter um token de acesso utilizável (não só o JWT), esse é um passo a mais que ainda falta implementar aqui.
+
+### Pré-requisitos
+
+- Python 3.9+
+- Connected App no Salesforce com "Use digital signatures" (usando o `connectedAppCertificate.crt` gerado aqui) e "Enable OAuth Settings" habilitados, com o usuário `SF_USERNAME` Pre-Authorized.
+
+### Setup e uso
+
+```bash
+cd sf-jwt
+chmod +x setup.sh
+./setup.sh
+
+source venv/bin/activate
+python gen_cert.py
+# -> faça upload de connectedAppCertificate.crt na Connected App
+
+# edite o .env com SF_CONSUMER_KEY e SF_USERNAME
+python gen_jwt.py
+```
+
+---
+
+## bulk-api
+
+Unifica os antigos `bulkApi_Query` e `bulkApi_Update` numa pasta só — eles compartilhavam o mesmo `auth.py` (Client Credentials Flow) e o mesmo objeto-alvo na prática, então faz mais sentido um único venv/`.env`/setup.
+
+### Estrutura
+
+```
+bulk-api/
+├── .gitignore
+├── auth.py                # autenticação (Client Credentials Flow) — compartilhado
+├── configure_query.py      # wizard interativo: objeto, campos, WHERE, ORDER BY, LIMIT
+├── configure_update.py     # wizard interativo: objeto, operação, external ID field
+├── field_mapping.py        # mapeia colunas do CSV -> campos reais da API (via Describe)
+├── query.py                 # executa a query (Bulk API 2.0 - jobs/query)
+├── update.py                 # executa insert/update/upsert/delete (Bulk API 2.0 - jobs/ingest)
+├── run_query.py              # configure_query.py + query.py num comando só
+├── run_update.py             # configure_update.py + field_mapping.py (opcional) + update.py
+├── requirements.txt
+└── setup.sh
+
+# gerados localmente, não versionados:
+├── venv/
+├── .env
+├── csv/                     # CSVs de entrada pro update (ex: vindos do split-large-csv)
+├── output/                  # CSV de saída da query
+├── header_mapping.json      # gerado por field_mapping.py
+└── logs/                    # log de execução + resultados de sucesso/erro por job
 ```
 
 ### Pré-requisitos
 
 - Python 3.9+
-- Connected App no Salesforce com "Enable Client Credentials Flow" habilitado e "Run As" apontando para o usuário de integração com permissão de editar o objeto alvo (Account).
+- Connected App no Salesforce com "Enable Client Credentials Flow" habilitado e "Run As" apontando pro usuário de integração, com permissão no objeto/operação que você for usar.
 
-### Setup (automático)
+### Setup
 
 ```bash
-cd bulkApi
+cd bulk-api
 chmod +x setup.sh
 ./setup.sh
 ```
 
-Isso cria `venv/`, instala `requests` e `python-dotenv`, gera o `.env` em branco e o `.gitignore`. Edite o `.env` com suas credenciais:
+Preencha pelo menos `SF_CLIENT_ID`, `SF_CLIENT_SECRET` e `SF_LOGIN_URL` (My Domain, ex: `https://suaorg.my.salesforce.com`) no `.env`. O resto pode ser preenchido na mão ou de forma guiada pelos comandos abaixo.
 
-```
-SF_CLIENT_ID=
-SF_CLIENT_SECRET=
-SF_LOGIN_URL=https://suaorg.my.salesforce.com   # My Domain, não login.salesforce.com
-SF_API_VERSION=v61.0
-CSV_DIR=./csv
-```
-
-### Uso
+### Uso — consultar (query)
 
 ```bash
 source venv/bin/activate
-set -a && source .env && set +a
-python bulk_update_account.py
+python run_query.py
 ```
 
-O script reautentica (via `auth.py`) antes de cada arquivo, processa os CSVs de `CSV_DIR` em ordem numérica, e para a sequência inteira se algum job tiver registros com falha (`stop_on_error=True` em `CONFIG`).
+Pergunta objeto, campos, `WHERE`/`ORDER BY`/`LIMIT` (cada um opcional, com pergunta sim/não), roda a query e salva o CSV em `SF_OUTPUT_PATH`.
+
+### Uso — atualizar em massa (insert/update/upsert/delete)
+
+```bash
+source venv/bin/activate
+python run_update.py
+```
+
+Pergunta objeto, operação e `CSV_DIR`; pergunta se as colunas do CSV batem com a API (se não, chama `field_mapping.py` automaticamente); processa todos os CSVs de `CSV_DIR` em ordem numérica, um job por vez, parando a sequência se algum tiver falha.
+
+Cada peça também roda isolada, se preferir: `python configure_query.py`, `python query.py`, `python configure_update.py`, `python field_mapping.py`, `python update.py`.
 
 ---
 
-## splitLargeCsv
+## split-large-csv
 
 ### Estrutura
 
 ```
-splitLargeCsv/
+split-large-csv/
 ├── .gitignore
 ├── requirements.txt
-├── setup.sh              # cria venv, requirements.txt e .env automaticamente
-└── split_csv.py           # divide o CSV de origem em N partes
-
-# gerados localmente, não versionados:
-├── venv/
-└── .env
+├── setup.sh
+└── split_csv.py
 ```
 
-### Setup (automático)
+### Setup e uso
 
 ```bash
-cd splitLargeCsv
+cd split-large-csv
 chmod +x setup.sh
 ./setup.sh
-```
 
-Edite o `.env` gerado:
-
-```
-INPUT_FILE=seu_arquivo.csv      # CSV de origem
-OUTPUT_DIR=./csv                # pasta de saída (pode apontar direto para bulkApi/csv)
-OUTPUT_PREFIX=parte             # gera parte_1.csv, parte_2.csv, ...
-MAX_ROWS=1000000                # linhas por arquivo
-```
-
-### Uso
-
-```bash
 source venv/bin/activate
+# edite o .env: INPUT_FILE, OUTPUT_DIR, OUTPUT_PREFIX, MAX_ROWS
 python split_csv.py
 ```
 
-Fluxo típico: gere os CSVs aqui apontando `OUTPUT_DIR` para a pasta `csv/` do `bulkApi`, depois rode o `bulkApi` para subir tudo em sequência.
+Fluxo típico: aponte `OUTPUT_DIR` direto pra `bulk-api/csv/`, depois rode `python run_update.py` no `bulk-api`.
 
 ---
 
-## Segurança — importante
-
-Este repositório é **público**. Nunca commite: `venv/`, `.env`, `server.key`, `server.crt`, `csv/`, `logs/`. Cada projeto já tem `.gitignore` cobrindo isso. Antes de qualquer `git push`, confirme que nada sensível está rastreado:
+## Fluxo ponta a ponta (exemplo: update de 23M registros)
 
 ```bash
-git ls-files | grep -E "\.key$|\.env$|venv/"
-```
+# 1. Dividir o CSV de origem em partes de 1M linhas
+cd split-large-csv && ./setup.sh
+source venv/bin/activate
+# .env: OUTPUT_DIR=../bulk-api/csv
+python split_csv.py
+deactivate
 
-Se o comando não retornar nada, está seguro para subir. Caso algum desses arquivos já tenha sido commitado, revogue a credencial correspondente (certificado na Connected App, ou Client Secret) e remova o arquivo do histórico do git (`git rm --cached` + reescrita de histórico com `git filter-repo` ou BFG, se necessário).
+# 2. Configurar e rodar o update em massa
+cd ../bulk-api && ./setup.sh
+source venv/bin/activate
+python run_update.py
+```

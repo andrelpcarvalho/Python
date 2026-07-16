@@ -1,0 +1,8 @@
+.env
+venv/
+logs/
+csv/
+output/
+header_mapping.json
+__pycache__/
+*.pyc
