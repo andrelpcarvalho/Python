@@ -40,6 +40,10 @@ from auth import authenticate, AuthError
 
 load_dotenv()
 
+
+class QueryApiError(Exception):
+    pass
+
 # ---------- CONFIG ----------
 def build_config():
     return {

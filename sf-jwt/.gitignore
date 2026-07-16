@@ -6,3 +6,4 @@ connectedAppCertificate.crt
 *.crt
 __pycache__/
 *.pyc
+.pytest_cache/
