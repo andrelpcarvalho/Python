@@ -94,3 +94,62 @@ def test_split_csv_uses_given_prefix(tmp_path):
     split_csv(str(input_file), str(output_dir), "contas_2024", max_rows=10)
 
     assert (output_dir / "contas_2024_1.csv").exists()
+
+
+# ---------- detecção automática de encoding ----------
+
+from split_csv import detect_encoding
+
+
+def test_detect_encoding_utf8_without_bom(tmp_path):
+    input_file = tmp_path / "input.csv"
+    input_file.write_bytes("Id,Nome\n001,João\n".encode("utf-8"))
+
+    assert detect_encoding(str(input_file)) in ("utf_8", "utf-8")
+
+
+def test_detect_encoding_utf8_with_bom_returns_utf8_sig(tmp_path):
+    input_file = tmp_path / "input.csv"
+    input_file.write_bytes("Id,Nome\n001,João\n".encode("utf-8-sig"))
+
+    assert detect_encoding(str(input_file)) == "utf-8-sig"
+
+
+def test_detect_encoding_cp1252(tmp_path):
+    input_file = tmp_path / "input.csv"
+    input_file.write_bytes("Id,Nome\n001,João da Silva\n002,Conceição Araújo\n003,José Ánderson\n".encode("cp1252"))
+
+    assert detect_encoding(str(input_file)) == "cp1252"
+
+
+def test_detect_encoding_empty_file_falls_back(tmp_path):
+    input_file = tmp_path / "input.csv"
+    input_file.write_bytes(b"")
+
+    assert detect_encoding(str(input_file)) == "utf-8-sig"
+
+
+def test_split_csv_handles_cp1252_input_without_corrupting_accents(tmp_path):
+    input_file = tmp_path / "input.csv"
+    input_file.write_bytes(
+        "Id,Nome\n001,João da Silva\n002,Conceição Araújo\n".encode("cp1252")
+    )
+
+    output_dir = tmp_path / "out"
+    split_csv(str(input_file), str(output_dir), "parte", max_rows=10)
+
+    content = (output_dir / "parte_1.csv").read_text(encoding="utf-8")
+    assert "João da Silva" in content
+    assert "Conceição Araújo" in content
+
+
+def test_split_csv_strips_bom_from_first_column_name(tmp_path):
+    input_file = tmp_path / "input.csv"
+    input_file.write_bytes("Id,Nome\n001,Acme\n".encode("utf-8-sig"))
+
+    output_dir = tmp_path / "out"
+    split_csv(str(input_file), str(output_dir), "parte", max_rows=10)
+
+    first_line = (output_dir / "parte_1.csv").read_text(encoding="utf-8").splitlines()[0]
+    assert first_line == "Id,Nome"
+    assert "\ufeff" not in first_line
